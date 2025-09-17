@@ -1,46 +1,44 @@
-from flask import Flask, render_template, request
+import streamlit as st
 import pandas as pd
 import pickle
+from sklearn.ensemble import RandomForestRegressor
 
-app = Flask(__name__)
+# Load the trained model
+model_path = 'random_forest_model.pkl'
+with open(model_path, 'rb') as file:
+    model_rf = pickle.load(file)
 
-# Load models
-model_names = [
-    'LinearRegression', 'RobustRegression', 'RidgeRegression', 'LassoRegression', 'ElasticNet', 
-    'PolynomialRegression', 'SGDRegressor', 'ANN', 'RandomForest', 'SVM', 'LGBM', 
-    'XGBoost', 'KNN'
-]
-models = {name: pickle.load(open(f'{name}.pkl', 'rb')) for name in model_names}
+# Function to predict based on user inputs
+def predict_btc_price(input_data):
+    # Make prediction using the model
+    prediction = model_rf.predict(input_data)
+    return prediction[0]  # Assuming model returns a single prediction
 
-# Load evaluation results
-results_df = pd.read_csv('model_evaluation_results.csv')
+def main():
+    # Title of your web app
+    st.title('Predict BTC Close Price')
 
-@app.route('/')
-def index():
-    return render_template('index.html', model_names=model_names)
-
-@app.route('/predict', methods=['POST'])
-def predict():
-    model_name = request.form['model']
-    input_data = {
-        'Avg. Area Income': float(request.form['Avg. Area Income']),
-        'Avg. Area House Age': float(request.form['Avg. Area House Age']),
-        'Avg. Area Number of Rooms': float(request.form['Avg. Area Number of Rooms']),
-        'Avg. Area Number of Bedrooms': float(request.form['Avg. Area Number of Bedrooms']),
-        'Area Population': float(request.form['Area Population'])
-    }
-    input_df = pd.DataFrame([input_data])
+    # Sidebar for user inputs
+    st.sidebar.title('Input Features')
     
-    if model_name in models:
-        model = models[model_name]
-        prediction = model.predict(input_df)[0]
-        return render_template('results.html', prediction=prediction, model_name=model_name)
-    else:
-        return jsonify({'error': 'Model not found'}), 400
+    # Inputs for USDT, BNB closing prices and volumes
+    usdt_close = st.sidebar.number_input('USDT Close Price', min_value=0.0, format="%.2f")
+    usdt_volume = st.sidebar.number_input('USDT Volume', min_value=0.0, format="%.2f")
+    bnb_close = st.sidebar.number_input('BNB Close Price', min_value=0.0, format="%.2f")
+    bnb_volume = st.sidebar.number_input('BNB Volume', min_value=0.0, format="%.2f")
 
-@app.route('/results')
-def results():
-    return render_template('model.html', tables=[results_df.to_html(classes='data')], titles=results_df.columns.values)
+    # Create input dataframe
+    input_data = pd.DataFrame({
+        'USDT_Close': [usdt_close],
+        'USDT_Volume': [usdt_volume],
+        'BNB_Close': [bnb_close],
+        'BNB_Volume': [bnb_volume]
+    })
+
+    # Button to trigger prediction
+    if st.button('Predict BTC Close Price'):
+        predicted_price = predict_btc_price(input_data)
+        st.write('Predicted BTC Close Price:', predicted_price)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    main()
